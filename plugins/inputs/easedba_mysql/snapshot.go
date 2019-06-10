@@ -2,7 +2,6 @@ package easedba_mysql
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/easedbautil"
@@ -100,14 +99,15 @@ func (m *Mysql) gatherSnapshot(db *sql.DB, serv string, accumulator telegraf.Acc
 		runningSqls.RunningSqlList = append(runningSqls.RunningSqlList, val)
 	}
 
-	text := []byte{'{', '}'}
+	//text := []byte{'{', '}'}
 	if len(runningSqls.RunningSqlList) > 0 {
-		text, err = json.Marshal(runningSqls)
-		if err != nil {
-			return fmt.Errorf("error marshaling running sql: %s", err)
-		}
+		fields["sql_snapshot"] = runningSqls
+		//text, err = json.Marshal(runningSqls)
+		//if err != nil {
+		//	return fmt.Errorf("error marshaling running sql: %s", err)
+		//}
 	}
-	fields["sql_snapshot"] = text
+
 
 	// fetch transaction snapshot
 	rows, err = db.Query(queryRunningTransactions)
@@ -134,14 +134,16 @@ func (m *Mysql) gatherSnapshot(db *sql.DB, serv string, accumulator telegraf.Acc
 			append(runningTransactions.RunningTransactionList, val)
 	}
 
-	text = []byte{'{', '}'}
+	//text = []byte{'{', '}'}
 	if len(runningTransactions.RunningTransactionList) > 0 {
-		text, err = json.Marshal(runningTransactions)
-		if err != nil {
-			return fmt.Errorf("error marshaling running transactions: %s", err)
-		}
+		//text, err = json.Marshal(runningTransactions)
+		//if err != nil {
+		//	return fmt.Errorf("error marshaling running transactions: %s", err)
+		//}
+
+		fields["trx_snapshot"] = runningTransactions
 	}
-	fields["trx_snapshot"] = text
+
 
 	// if a transaction is blocking others, try to fetch the history sql of this transaction
 	if len(blockingThreadIds) > 0 {
@@ -175,14 +177,15 @@ func (m *Mysql) gatherSnapshot(db *sql.DB, serv string, accumulator telegraf.Acc
 				transactionHistories.TransactionHistoryList, val)
 		}
 
-		text = []byte{'{', '}'}
+		//text = []byte{'{', '}'}
 		if len(transactionHistories.TransactionHistoryList) > 0 {
-			text, err = json.Marshal(transactionHistories)
-			if err != nil {
-				return fmt.Errorf("error marshaling transaction history: %s", err)
-			}
+			fields["trx_history"] = transactionHistories
+			//text, err = json.Marshal(transactionHistories)
+			//if err != nil {
+			//	return fmt.Errorf("error marshaling transaction history: %s", err)
+			//}
 		}
-		fields["trx_history"] = text
+
 	}
 
 	accumulator.AddFields(easedbautl.SchemaSnapshot, fields, tags)
