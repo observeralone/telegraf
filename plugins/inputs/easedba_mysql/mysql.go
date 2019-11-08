@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/influxdata/telegraf/plugins/easedbautil"
 	"github.com/influxdata/telegraf/plugins/inputs/easedba_mysql/global"
+	"strconv"
 	"sync"
 	"time"
 
@@ -174,8 +175,6 @@ func (m *Mysql) gatherThroughput(db *sql.DB, serv string, acc telegraf.Accumulat
 		fields[convertedName] = delta
 	}
 
-
-
 	acc.AddFields(easedbautl.SchemaThroughput, fields, tags)
 
 	return nil
@@ -190,7 +189,20 @@ func (m *Mysql) gatherConnection(db *sql.DB, serv string, acc telegraf.Accumulat
 	tags := map[string]string{"server": servtag}
 	fields := make(map[string]interface{})
 	for key, convertedName := range easedba_v1.ConnectionMappings {
-		val, err := status.GetPropertyDelta(key)
+
+		var val int64 = 0
+		var err error
+		if key == "Threads_connected" || key == "Threads_running" {
+			t, err := status.GetProperty(key)
+
+			if err != nil {
+				return fmt.Errorf("error getting %s, connection metrics: %s", servtag, err)
+			}
+			val, err = strconv.ParseInt(t, 10, 64)
+		} else {
+			val, err = status.GetPropertyDelta(key)
+		}
+
 		if err != nil {
 			return fmt.Errorf("error getting %s, connection metrics: %s", servtag, err)
 		}

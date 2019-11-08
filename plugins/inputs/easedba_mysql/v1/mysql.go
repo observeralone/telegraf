@@ -29,6 +29,7 @@ var ConnectionMappings = map[string]string{
 	"Aborted_clients":   "aborted_clients",
 	"Aborted_connects":  "aborted_connects",
 	"Locked_connects":   "locked_connects",
+	"Threads_running":   "threads_running",
 }
 
 var InnodbMappings = map[string]string{
