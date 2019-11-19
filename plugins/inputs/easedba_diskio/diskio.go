@@ -170,9 +170,10 @@ func (s *DiskIO) Gather(acc telegraf.Accumulator) error {
 			}
 			switch k {
 			case "reads", "writes", "read_bytes", "write_bytes", "iops_in_progress":
-				adaptedFields[k] = v
+				adaptedFields[k] = fmt.Sprintf("%d", v)
 			case "read_time", "write_time", "io_time", "weighted_io_time":
-				adaptedFields[k] = v * 100 / (s.CurrTime.Sub(s.LastTime).Nanoseconds() / int64(time.Millisecond))
+				txt := fmt.Sprintf("%d", v*100/(s.CurrTime.Sub(s.LastTime).Nanoseconds()/int64(time.Millisecond)))
+				adaptedFields[k] = txt
 			}
 		}
 
