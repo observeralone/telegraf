@@ -2,52 +2,45 @@ package global
 
 import (
 	"database/sql"
-	"fmt"
-	"strconv"
 	"time"
+
+	"github.com/influxdata/telegraf/plugins/easedbautil"
 )
-//This package is not thread safe
+
 type Status struct {
-	lastStatus map[string]string
-	CurrStatus map[string]string
-	currTime   time.Time
-	lastTime   time.Time
-	servertag  string
-	ok         bool
+	easedbautl.BaseStatus
+	db *sql.DB
 }
 
-func New(servertag string) *Status {
-	g := &Status{}
-	g.CurrStatus = nil
-	g.lastStatus = nil
-	g.lastTime = time.Now()
-	g.currTime = time.Now()
-	g.ok = true
-	g.servertag = servertag
-
-	return g
+func New(serverTag string, db *sql.DB) *Status {
+	s := &Status{*easedbautl.NewBaseStatus(serverTag), db}
+	return s
 }
 
-func (g *Status) Fill( db * sql.DB ) error {
+func (g *Status) Fill() error {
+	g.Locker.Lock()
+	defer g.Locker.Unlock()
+
+	ok := false
 	defer func() {
-		if ! g.ok {
+		if ! ok {
 			//clean history data if current fetch failed
 			// otherwise the delta is not expected since they will cross multi intervals
-			g.lastStatus = nil
+			g.LastStatus = nil
 			g.CurrStatus = nil
 		}
 	}()
 
-	g.ok = false
+
 	currTime := time.Now()
 
-	rows, err := db.Query("SHOW global status")
+	rows, err := g.db.Query("SHOW global status")
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
-	values := map[string]string{}
+	values := make(map[string]interface{})
 	for rows.Next() {
 		var key string
 		var val string
@@ -60,58 +53,13 @@ func (g *Status) Fill( db * sql.DB ) error {
 	}
 
 	if g.CurrStatus != nil {
-		g.lastStatus = g.CurrStatus
-		g.lastTime = g.currTime
+		g.LastStatus = g.CurrStatus
+		g.LastTime = g.CurrTime
 	}
 
 	g.CurrStatus = values
-	g.currTime =  currTime
+	g.CurrTime = currTime
 
-	g.ok = true
+	ok = true
 	return nil
-}
-
-func (g *Status) GetProperty(property string) ( string, error) {
-	if  g.CurrStatus == nil  {
-		return "", fmt.Errorf("errror getting [%s] property: CurrStatus is nil", g.servertag)
-	}
-
-	val, ok := g.CurrStatus[property]
-	if ! ok {
-		return "", fmt.Errorf("errror getting [%s] property %s doesnot exist", g.servertag, property)
-	}
-
-	return string(val), nil
-}
-
-func (g *Status) GetPropertyDelta( property string ) (int64, error) {
-	if g.lastStatus == nil {
-		return  0, fmt.Errorf("error getting [%s] propery delta value, property: %s, no history data yet", g.servertag, property)
-	}
-
-	if  g.CurrStatus == nil  {
-		return 0, fmt.Errorf("errror getting [%s] property: CurrStatus is nil", g.servertag)
-	}
-
-	lastVal, ok := g.lastStatus[property]
-	if ! ok {
-		return 0, fmt.Errorf("errror getting [%s] property delta, history property  %s doesnot exist", g.servertag, property)
-	}
-
-	currVal, ok := g.CurrStatus[property]
-	if ! ok {
-		return 0, fmt.Errorf("errror getting [%s] property delta, property  %s doesnot exist", g.servertag, property)
-	}
-
-	lastNum, err := strconv.ParseInt(lastVal, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("errror getting [%s] property delta, property  %s is not a number: %s", g.servertag, property, err)
-	}
-
-	currNum, err := strconv.ParseInt(currVal, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("errror getting [%s] property delta, property  %s is not a number: %s", g.servertag, property, err)
-	}
-
-	return currNum - lastNum, nil
 }

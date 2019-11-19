@@ -5,6 +5,7 @@ import (
 	"log"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/filter"
@@ -14,6 +15,9 @@ import (
 
 var (
 	varRegex = regexp.MustCompile(`\$(?:\w+|\{\w+\})`)
+
+	// map{device name : Status }
+	statusMap = make(map[string]*Status)
 )
 
 type DiskIO struct {
@@ -102,7 +106,7 @@ func (s *DiskIO) Gather(acc telegraf.Accumulator) error {
 		return fmt.Errorf("error getting disk io info: %s", err)
 	}
 
-	for _, io := range diskio {
+	for k, io := range diskio {
 
 		match := false
 		if s.deviceFilter != nil && s.deviceFilter.Match(io.Name) {
@@ -148,7 +152,31 @@ func (s *DiskIO) Gather(acc telegraf.Accumulator) error {
 			"weighted_io_time": io.WeightedIO,
 			"iops_in_progress": io.IopsInProgress,
 		}
-		acc.AddCounter("diskio", fields, tags)
+
+		s, ok := statusMap[k]
+		if ! ok {
+			s = New(k)
+			statusMap[k] = s
+		}
+
+		s.Fill(fields)
+
+		adaptedFields := make(map[string]interface{})
+
+		for k := range fields {
+			v, err := s.GetPropertyDelta(k)
+			if err != nil {
+				continue
+			}
+			switch k {
+			case "reads", "writes", "read_bytes", "write_bytes", "iops_in_progress":
+				adaptedFields[k] = v
+			case "read_time", "write_time", "io_time", "weighted_io_time":
+				adaptedFields[k] = v * 100 / (s.CurrTime.Sub(s.LastTime).Nanoseconds() / int64(time.Millisecond))
+			}
+		}
+
+		acc.AddCounter("diskio", adaptedFields, tags)
 	}
 
 	return nil

@@ -99,34 +99,34 @@ func (m *Mysql) gatherServer(server string, acc telegraf.Accumulator) error {
 
 	status, ok := easedba_v1.GlobalStatus[servtag]
 	if !ok {
-		status = global.New(servtag)
+		status = global.New(servtag, db)
 		easedba_v1.GlobalStatus[servtag] = status
 	}
 
-	err = status.Fill(db)
+	err = status.Fill()
 	if err != nil {
 		return err
 	}
 
 	//throughput index
 	if m.GatherGlobalStatuses {
-		err = m.gatherThroughput(db, server, acc, servtag)
+		err = m.gatherThroughput(acc, servtag)
 
 		if err != nil {
 			return err
 		}
 	}
 
-	//add megaeasdba index
+	//add megaeasedba index
 	if m.GatherConnection {
-		err = m.gatherConnection(db, server, acc, servtag)
+		err = m.gatherConnection(acc, servtag)
 		if err != nil {
 			return err
 		}
 	}
 
 	if m.GatherInnodb {
-		err = m.gatherInnodb(db, server, acc, servtag)
+		err = m.gatherInnodb(acc, servtag)
 		if err != nil {
 			return err
 		}
@@ -161,7 +161,7 @@ func (m *Mysql) gatherServer(server string, acc telegraf.Accumulator) error {
 // gatherThroughput can be used to get MySQL status metrics
 // the mappings of actual names and names of each status to be exported
 // to output is provided on mappings variable
-func (m *Mysql) gatherThroughput(db *sql.DB, serv string, acc telegraf.Accumulator, servtag string) error {
+func (m *Mysql) gatherThroughput(acc telegraf.Accumulator, servtag string) error {
 	status, _ := easedba_v1.GlobalStatus[servtag]
 
 	tags := map[string]string{"server": servtag}
@@ -183,7 +183,7 @@ func (m *Mysql) gatherThroughput(db *sql.DB, serv string, acc telegraf.Accumulat
 // gatherconnection can be used to get MySQL status metrics
 // the mappings of actual names and names of each status to be exported
 // to output is provided on mappings variable
-func (m *Mysql) gatherConnection(db *sql.DB, serv string, acc telegraf.Accumulator, servtag string) error {
+func (m *Mysql) gatherConnection(acc telegraf.Accumulator, servtag string) error {
 	status, _ := easedba_v1.GlobalStatus[servtag]
 
 	tags := map[string]string{"server": servtag}
@@ -216,7 +216,7 @@ func (m *Mysql) gatherConnection(db *sql.DB, serv string, acc telegraf.Accumulat
 // gathercinnodb can be used to get MySQL status metrics
 // the mappings of actual names and names of each status to be exported
 // to output is provided on mappings variable
-func (m *Mysql) gatherInnodb(db *sql.DB, serv string, acc telegraf.Accumulator, servtag string) error {
+func (m *Mysql) gatherInnodb(acc telegraf.Accumulator, servtag string) error {
 	status, _ := easedba_v1.GlobalStatus[servtag]
 	tags := map[string]string{"server": servtag}
 	fields := make(map[string]interface{})

@@ -58,7 +58,7 @@ FROM
         ON c.trx_mysql_thread_id = e.processlist_id
 
 `
-	queryBlockingTransactions = `
+	queryBlockkingSqlHistory = `
 SELECT
     b.processlist_id process_id,
     a.thread_id,
@@ -156,7 +156,7 @@ func (m *Mysql) gatherSnapshot(db *sql.DB, serv string, accumulator telegraf.Acc
 			}
 		}
 
-		rows, err = db.Query(fmt.Sprintf(queryBlockingTransactions, ids))
+		rows, err = db.Query(fmt.Sprintf(queryBlockkingSqlHistory, ids))
 		if err != nil {
 			return fmt.Errorf("error querying running sql: %s", err)
 		}
