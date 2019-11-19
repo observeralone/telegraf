@@ -142,15 +142,15 @@ func (s *DiskIO) Gather(acc telegraf.Accumulator) error {
 		}
 
 		fields := map[string]interface{}{
-			"reads":            io.ReadCount,
-			"writes":           io.WriteCount,
-			"read_bytes":       io.ReadBytes,
-			"write_bytes":      io.WriteBytes,
-			"read_time":        io.ReadTime,
-			"write_time":       io.WriteTime,
-			"io_time":          io.IoTime,
-			"weighted_io_time": io.WeightedIO,
-			"iops_in_progress": io.IopsInProgress,
+			"reads":            fmt.Sprintf("%d", io.ReadCount),
+			"writes":           fmt.Sprintf("%d", io.WriteCount),
+			"read_bytes":       fmt.Sprintf("%d", io.ReadBytes),
+			"write_bytes":      fmt.Sprintf("%d", io.WriteBytes),
+			"read_time":        fmt.Sprintf("%d", io.ReadTime),
+			"write_time":       fmt.Sprintf("%d", io.WriteTime),
+			"io_time":          fmt.Sprintf("%d", io.IoTime),
+			"weighted_io_time": fmt.Sprintf("%d", io.WeightedIO),
+			"iops_in_progress": fmt.Sprintf("%d", io.IopsInProgress),
 		}
 
 		s, ok := statusMap[k]
@@ -170,10 +170,9 @@ func (s *DiskIO) Gather(acc telegraf.Accumulator) error {
 			}
 			switch k {
 			case "reads", "writes", "read_bytes", "write_bytes", "iops_in_progress":
-				adaptedFields[k] = fmt.Sprintf("%d", v)
+				adaptedFields[k] = v
 			case "read_time", "write_time", "io_time", "weighted_io_time":
-				txt := fmt.Sprintf("%d", v*100/(s.CurrTime.Sub(s.LastTime).Nanoseconds()/int64(time.Millisecond)))
-				adaptedFields[k] = txt
+				adaptedFields[k] = v * 100 / (s.CurrTime.Sub(s.LastTime).Nanoseconds() / int64(time.Millisecond))
 			}
 		}
 
