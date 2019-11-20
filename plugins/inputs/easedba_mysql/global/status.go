@@ -9,15 +9,14 @@ import (
 
 type Status struct {
 	easedbautl.BaseStatus
-	db *sql.DB
 }
 
 func New(serverTag string, db *sql.DB) *Status {
-	s := &Status{*easedbautl.NewBaseStatus(serverTag), db}
+	s := &Status{*easedbautl.NewBaseStatus(serverTag)}
 	return s
 }
 
-func (g *Status) Fill() error {
+func (g *Status) Fill(db *sql.DB) error {
 	g.Locker.Lock()
 	defer g.Locker.Unlock()
 
@@ -31,10 +30,9 @@ func (g *Status) Fill() error {
 		}
 	}()
 
-
 	currTime := time.Now()
 
-	rows, err := g.db.Query("SHOW global status")
+	rows, err := db.Query("SHOW global status")
 	if err != nil {
 		return err
 	}

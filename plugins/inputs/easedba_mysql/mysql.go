@@ -103,7 +103,7 @@ func (m *Mysql) gatherServer(server string, acc telegraf.Accumulator) error {
 		easedba_v1.GlobalStatus[servtag] = status
 	}
 
-	err = status.Fill()
+	err = status.Fill(db)
 	if err != nil {
 		return err
 	}
