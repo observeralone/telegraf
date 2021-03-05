@@ -1,6 +1,7 @@
 package all
 
 import (
+	_ "github.com/influxdata/telegraf/plugins/aggregators/accesslogstat"
 	_ "github.com/influxdata/telegraf/plugins/aggregators/basicstats"
 	_ "github.com/influxdata/telegraf/plugins/aggregators/final"
 	_ "github.com/influxdata/telegraf/plugins/aggregators/histogram"
