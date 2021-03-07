@@ -3,7 +3,10 @@ package easeaccesslogstat
 // accesslogstat.go
 
 import (
+	"fmt"
+	"log"
 	"strconv"
+	"time"
 
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/aggregators"
@@ -11,7 +14,8 @@ import (
 )
 
 type AccessLogStat struct {
-	cache map[uint64]aggregate
+	cache           map[uint64]aggregate
+	RequestTimeUnit string `toml:"request_time_unit"`
 }
 
 func NewAccessLogStat() telegraf.Aggregator {
@@ -26,39 +30,37 @@ type aggregate struct {
 	errMeter metrics.Meter
 	sample   metrics.Sample
 	counter  counter
+	count    int64
 	name     string
 	tags     map[string]string
 }
 
 // The accumulated value from monitoring to the current time
 type counter struct {
-	count    uint64
+	count    int64
 	reqSize  uint64
 	respSize uint64
 }
 
 var sampleConfig = `
-	## [[inputs.tail]]
-	##   ## file(s) to tail:
-	##   files = ["/Users/beyond/go/host01.log"]
-	##   from_beginning = true
-
-	##   #name of the "Metric" (which I want to see in Grafana eventually)
-	##   name_override = "magicparser"
-
-	##   grok_patterns = ["%{CUSTOM_LOG}"]
-	##   grok_custom_patterns = '''
-	## MAGICDATE %{YEAR}-%{MONTHNUM}-%{MONTHDAY} %{TIME}
-	## CUSTOM_LOG %{MAGICDATE:date},%{WORD:log_entry_hostname:tag},%{WORD:log_entry_service:tag},%{WORD:log_entry_state},%{WORD:status_code:int},%{WORD:request_time},%{WORD:request_size},%{WORD:response_size},%{WORD:url}
-	## '''
-	##   data_format = "grok"
-
-	# [[aggregators.accesslogstat]]
-	#   period = "30s"
-
-	## [[outputs.file]]
-	##   files = ["/Users/beyond/go/stdout"]
-	##   data_format = "json"
+  ## [[inputs.tail]]
+  ## ## file(s) to tail:
+  ## files = ["/Users/ease/go/access.log"]
+  ## from_beginning = true
+  ##
+  ## #name of the "Metric" (which I want to see in Grafana eventually)
+  ## name_override = "magicparser"
+  ##
+  ## grok_patterns = ["\\[%{NON_SPACE:timestamp:ts-rfc3339}\\] \\[%{NON_SPACE:request_time:float}\\] \\[%{NON_SPACE:origin:tag} %{NON_SPACE:service:tag} %{NON_SPACE:host_ipv4:tag} %{NON_SPACE:host_name:tag} %{NON_SPACE:client_ip:tag} %{NON_SPACE:status_code} %{NON_SPACE:request_size:int} %{NON_SPACE:response_size:int} %{NON_SPACE:trace_id:drop}\\]"]
+  ##   grok_custom_patterns = '''NON_SPACE [^ ]*'''
+  ## data_format = "grok"
+  ##
+  ## [[aggregators.accesslogstat]]
+  ##   period = "30s"
+  ##
+  ## [[outputs.file]]
+  ##   files = ["/Users/ease/go/stdout"]
+  ##   data_format = "json"
 
   ## General Aggregator Arguments:
   ## The period on which to flush & clear the aggregator.
@@ -66,6 +68,7 @@ var sampleConfig = `
   ## If true, the original metric will be dropped by the
   ## aggregator and will not get sent to the output plugins.
   drop_original = false
+  request_time_unit = "s"
 `
 
 func (m *AccessLogStat) SampleConfig() string {
@@ -94,49 +97,69 @@ func (m *AccessLogStat) Add(in telegraf.Metric) {
 			},
 		}
 		m.cache[id] = a
-		add(a, in)
+		m.add(&a, in)
 	} else {
-		add(m.cache[id], in)
+		a := m.cache[id]
+		m.add(&a, in)
 	}
 }
 
-func add(a aggregate, in telegraf.Metric) {
+//todo pase time log_timestamp
+
+func (m *AccessLogStat) add(a *aggregate, in telegraf.Metric) {
 	a.meter.Mark(1)
 	a.counter.count++
 	statusCodeName := "status_code"
 	requestTimeName := "request_time"
 	requestSizeName := "request_size"
 	responseSizeName := "response_size"
-	// requestTimeUnit := "s"
 	if in.HasField(statusCodeName) {
 		statusCode, _ := in.GetField(statusCodeName)
 		if convertInt(statusCode) > 400 {
 			a.errMeter.Mark(1)
 		}
 	}
-	counter := a.counter
 	if in.HasField(requestTimeName) {
 		requestTime, _ := in.GetField(requestTimeName)
 		//todo change to time.Duration
-		duration := convertInt(requestTime)
+		var requestTimeUnit = "s"
+		if m.RequestTimeUnit != "" {
+			requestTimeUnit = m.RequestTimeUnit
+		}
+		duration := convertDuration(requestTimeUnit, requestTime)
 		a.sample.Update(duration)
 	}
 
 	if in.HasField(requestSizeName) {
 		requestSize, _ := in.GetField(requestSizeName)
-		counter.reqSize += uint64(convertInt(requestSize))
+		a.counter.reqSize += uint64(convertInt(requestSize))
 	}
 	if in.HasField(responseSizeName) {
 		responseSize, _ := in.GetField(responseSizeName)
-		counter.respSize += uint64(convertInt(responseSize))
+		a.counter.respSize += uint64(convertInt(responseSize))
 	}
+}
+
+func convertDuration(unit string, in interface{}) int64 {
+	str := fmt.Sprintf("%v%v", in, unit)
+	duration, err := time.ParseDuration(str)
+	if err != nil {
+		log.Fatal("E! ParseDuration " + str + " fail! " + err.Error())
+		return 0
+	}
+	return int64(duration.Milliseconds())
 }
 
 func convertInt(in interface{}) int64 {
 	switch v := in.(type) {
 	case string:
-		result, _ := strconv.ParseInt(v, 10, 64)
+		result, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			log.Fatal("E! string.parseInt(" + v + ") fail! " + err.Error())
+			return 0
+		}
 		return result
+
 	default:
 		return in.(int64)
 	}
