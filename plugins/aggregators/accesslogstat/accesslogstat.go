@@ -29,7 +29,7 @@ type aggregate struct {
 	meter    metrics.Meter
 	errMeter metrics.Meter
 	sample   metrics.Sample
-	counter  counter
+	counter  *counter
 	count    int64
 	name     string
 	tags     map[string]string
@@ -90,7 +90,7 @@ func (m *AccessLogStat) Add(in telegraf.Metric) {
 			errMeter: metrics.NewMeter(),
 			// https://github.com/rcrowley/go-metrics/blob/3113b8401b8a98917cde58f8bbd42a1b1c03b1fd/sample_test.go#L65
 			sample: metrics.NewExpDecaySample(1028, 0.015),
-			counter: counter{
+			counter: &counter{
 				count:    0,
 				reqSize:  0,
 				respSize: 0,
@@ -147,7 +147,7 @@ func convertDuration(unit string, in interface{}) int64 {
 		log.Fatal("E! ParseDuration " + str + " fail! " + err.Error())
 		return 0
 	}
-	return int64(duration.Milliseconds())
+	return int64(duration) / 1e6
 }
 
 func convertInt(in interface{}) int64 {

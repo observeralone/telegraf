@@ -1,6 +1,8 @@
 package easeaccesslogstat
 
 import (
+	"fmt"
+	"log"
 	"testing"
 	"time"
 
@@ -31,6 +33,7 @@ func TestBasic(t *testing.T) {
 	acc := testutil.Accumulator{}
 
 	vc.Add(m1)
+	vc.Add(m1)
 	vc.Push(&acc)
 
 	// expectedFields := map[string]interface{}{
@@ -41,4 +44,14 @@ func TestBasic(t *testing.T) {
 	// 	"foo": "bar",
 	// }
 	// acc.AssertContainsTaggedFields(t, "m1", expectedFields, expectedTags)
+}
+
+func TestDuration(t *testing.T) {
+	const str = "10s"
+	duration, err := time.ParseDuration(str)
+	if err != nil {
+		return
+	}
+	result := int64(duration) / 1e6
+	log.Println("string.parseInt(" + str + ") to " + fmt.Sprint(result) + "! ")
 }
