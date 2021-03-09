@@ -46,6 +46,13 @@ func TestBasic(t *testing.T) {
 	// acc.AssertContainsTaggedFields(t, "m1", expectedFields, expectedTags)
 }
 
+func TestChangeNumType(t *testing.T) {
+	floatNum := float64(10)
+	log.Println("floatNum " + fmt.Sprint(floatNum) + "! ")
+	intNum := int64(floatNum)
+	log.Println("result to " + fmt.Sprint(intNum) + "! ")
+}
+
 func TestDuration(t *testing.T) {
 	const str = "10s"
 	duration, err := time.ParseDuration(str)

@@ -15,7 +15,8 @@ import (
 
 type AccessLogStat struct {
 	cache           map[uint64]aggregate
-	RequestTimeUnit string `toml:"request_time_unit"`
+	RequestTimeUnit string            `toml:"request_time_unit"`
+	Tags            map[string]string `toml:"tags"`
 }
 
 func NewAccessLogStat() telegraf.Aggregator {
@@ -165,10 +166,6 @@ func convertInt(in interface{}) int64 {
 	}
 }
 
-func nanoToMilli(f float64) float64 {
-	return f / 1000000
-}
-
 func (m *AccessLogStat) Push(acc telegraf.Accumulator) {
 	for _, aggregate := range m.cache {
 
@@ -193,38 +190,49 @@ func (m *AccessLogStat) Push(acc telegraf.Accumulator) {
 			0.999,
 		})
 
-		for i, p := range percentiles {
-			percentiles[i] = nanoToMilli(p)
-		}
+		// for i, p := range percentiles {
+		// 	percentiles[i] = int64(p)
+		// }
 
 		counter := aggregate.counter
 
 		fields := map[string]interface{}{
-			"count":         counter.count,
-			"m1":            m1,
-			"m5":            m5,
-			"m15":           m15,
-			"errCount":      errMeter.Count(),
-			"m1err":         m1Err,
-			"m5err":         m5Err,
-			"m15err":        m15Err,
-			"m1ErrPercent":  m1ErrPercent,
-			"m5ErrPercent":  m5ErrPercent,
-			"m15ErrPercent": m15ErrPercent,
-			"p25":           percentiles[0],
-			"p50":           percentiles[1],
-			"p75":           percentiles[2],
-			"p95":           percentiles[3],
-			"p98":           percentiles[4],
-			"p99":           percentiles[5],
-			"p999":          percentiles[6],
-			"min":           aggregate.sample.Min(),
-			"mean":          aggregate.sample.Mean(),
-			"max":           aggregate.sample.Max(),
-			"reqSize":       counter.reqSize,
-			"respSize":      counter.respSize,
+			"cnt":       counter.count,
+			"m1":        m1,
+			"m5":        m5,
+			"m15":       m15,
+			"errcnt":    errMeter.Count(),
+			"m1err":     m1Err,
+			"m5err":     m5Err,
+			"m15err":    m15Err,
+			"m1errpct":  m1ErrPercent,
+			"m5errpct":  m5ErrPercent,
+			"m15errpct": m15ErrPercent,
+			"p25":       percentiles[0],
+			"p50":       percentiles[1],
+			"p75":       percentiles[2],
+			"p95":       percentiles[3],
+			"p98":       percentiles[4],
+			"p99":       percentiles[5],
+			"p999":      percentiles[6],
+			"min":       aggregate.sample.Min(),
+			"mean":      aggregate.sample.Mean(),
+			"max":       aggregate.sample.Max(),
+			"reqsize":   counter.reqSize,
+			"respsize":  counter.respSize,
 		}
-		acc.AddFields(aggregate.name, fields, aggregate.tags)
+		if m.Tags == nil || len(m.Tags) == 0 {
+			acc.AddFields(aggregate.name, fields, aggregate.tags)
+		} else {
+			tags := make(map[string]string)
+			for k, v := range aggregate.tags {
+				tags[k] = v
+			}
+			for k, v := range m.Tags {
+				tags[k] = v
+			}
+			acc.AddFields(aggregate.name, fields, tags)
+		}
 	}
 }
 
